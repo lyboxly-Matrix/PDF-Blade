@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://lyboxly-matrix.github.io/PDF-Blade/sitemap.xml

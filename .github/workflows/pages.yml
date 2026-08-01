@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - index.html
+      - robots.txt
+      - sitemap.xml
+      - site.webmanifest
+      - assets/**
       - .github/workflows/pages.yml
   workflow_dispatch:
 
@@ -33,7 +37,8 @@ jobs:
       - name: Prepare site
         run: |
           mkdir _site
-          cp index.html _site/index.html
+          cp index.html robots.txt sitemap.xml site.webmanifest _site/
+          cp -R assets _site/assets
           touch _site/.nojekyll
 
       - name: Upload Pages artifact
