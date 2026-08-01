@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Blade — 极速 PDF 拆分</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0a0f; --panel:#13131c; --panel-2:#1b1b27;
+    --line:#2a2a3a; --text:#e8e8f0; --muted:#8a8aa0;
+    --accent:#6d5efc; --accent-2:#22d3ee; --danger:#ff4d6d;
+    --grad:linear-gradient(135deg,#6d5efc 0%,#22d3ee 100%);
+    --radius:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    background:radial-gradient(1200px 600px at 20% -10%,#1a1638 0%,transparent 60%),
+               radial-gradient(900px 500px at 90% 0%,#06303a 0%,transparent 55%),
+               var(--bg);
+    color:var(--text);min-height:100vh;padding:32px 20px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto}
+  header{display:flex;align-items:center;gap:14px;margin-bottom:8px}
+  .logo{width:46px;height:46px;border-radius:13px;background:var(--grad);
+    display:grid;place-items:center;font-size:24px;box-shadow:0 8px 30px rgba(109,94,252,.4)}
+  h1{font-size:28px;font-weight:800;letter-spacing:-.5px;
+    background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .tag{color:var(--muted);font-size:14px;margin:2px 0 28px 60px}
+
+  /* Dropzone */
+  .drop{
+    border:2px dashed var(--line);border-radius:var(--radius);
+    background:linear-gradient(180deg,var(--panel) 0%,var(--panel-2) 100%);
+    padding:56px 24px;text-align:center;cursor:pointer;
+    transition:.25s;position:relative;overflow:hidden;
+  }
+  .drop:hover,.drop.over{border-color:var(--accent);background:var(--panel-2);
+    box-shadow:0 0 0 4px rgba(109,94,252,.12) inset}
+  .drop.over{transform:scale(1.005)}
+  .drop .ico{font-size:54px;margin-bottom:14px;filter:drop-shadow(0 6px 18px rgba(34,211,238,.35))}
+  .drop h2{font-size:20px;font-weight:700;margin-bottom:6px}
+  .drop p{color:var(--muted);font-size:14px}
+  .drop .btn{margin-top:18px;display:inline-block}
+  .btn{background:var(--grad);color:#fff;border:none;padding:12px 26px;
+    border-radius:11px;font-size:15px;font-weight:700;cursor:pointer;
+    transition:.2s;box-shadow:0 6px 20px rgba(109,94,252,.35)}
+  .btn:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(109,94,252,.5)}
+  .btn:active{transform:translateY(0)}
+  .btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:none;color:var(--text)}
+  .btn.ghost:hover{border-color:var(--accent);background:var(--panel-2)}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+  /* App view */
+  .app{display:none;margin-top:24px}
+  .bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 18px;margin-bottom:20px}
+  .file-meta{flex:1;min-width:200px}
+  .file-meta .name{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;max-width:340px}
+  .file-meta .sub{color:var(--muted);font-size:13px;margin-top:2px}
+
+  /* Mode tabs */
+  .modes{display:flex;gap:8px;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;padding:6px;margin-bottom:20px;flex-wrap:wrap}
+  .mode{flex:1;min-width:130px;text-align:center;padding:12px;border-radius:10px;
+    cursor:pointer;color:var(--muted);font-weight:600;font-size:14px;transition:.2s}
+  .mode.active{background:var(--grad);color:#fff;box-shadow:0 6px 18px rgba(109,94,252,.35)}
+  .mode:not(.active):hover{background:var(--panel-2);color:var(--text)}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px;margin-bottom:20px}
+  .panel h3{font-size:16px;margin-bottom:6px}
+  .panel .hint{color:var(--muted);font-size:13px;margin-bottom:16px}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  input[type=text],input[type=number]{background:var(--bg);border:1px solid var(--line);
+    color:var(--text);padding:11px 14px;border-radius:10px;font-size:14px;outline:none;transition:.2s}
+  input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(109,94,252,.15)}
+  input[type=text]{flex:1;min-width:220px}
+  label.fld{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+
+  /* Thumbnails grid */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
+    gap:14px;max-height:520px;overflow-y:auto;padding:4px}
+  .thumb{position:relative;border:2px solid var(--line);border-radius:12px;overflow:hidden;
+    cursor:pointer;background:#fff;transition:.18s;aspect-ratio:.75}
+  .thumb canvas{width:100%;height:100%;object-fit:contain;display:block}
+  .thumb .pg{position:absolute;left:6px;bottom:6px;background:rgba(10,10,15,.82);
+    color:#fff;font-size:11px;padding:3px 8px;border-radius:7px;font-weight:600}
+  .thumb .ck{position:absolute;right:6px;top:6px;width:22px;height:22px;border-radius:50%;
+    background:rgba(10,10,15,.6);display:grid;place-items:center;color:#fff;font-size:13px;opacity:0}
+  .thumb.sel{border-color:var(--accent);box-shadow:0 0 0 3px rgba(109,94,252,.3)}
+  .thumb.sel .ck{opacity:1;background:var(--accent)}
+  .thumb:hover{transform:translateY(-3px)}
+
+  .selbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px}
+  .selbar .cnt{color:var(--muted);font-size:13px}
+
+  .actions{display:flex;gap:12px;justify-content:flex-end;flex-wrap:wrap}
+
+  /* progress */
+  .prog{height:6px;background:var(--panel-2);border-radius:6px;overflow:hidden;margin-top:14px;display:none}
+  .prog.show{display:block}
+  .prog i{display:block;height:100%;width:0;background:var(--grad);transition:width .3s}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(120px);
+    background:var(--panel);border:1px solid var(--line);padding:14px 22px;border-radius:12px;
+    font-size:14px;box-shadow:0 12px 40px rgba(0,0,0,.5);transition:.35s;z-index:99}
+  .toast.show{transform:translateX(-50%) translateY(0)}
+  .toast.ok{border-color:#2dd4a7}.toast.err{border-color:var(--danger)}
+
+  .foot{text-align:center;color:var(--muted);font-size:12px;margin-top:30px}
+  .foot b{color:var(--accent-2)}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
+  ::-webkit-scrollbar-thumb:hover{background:var(--accent)}
+  .hide{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">🗡️</div>
+    <div>
+      <h1>PDF Blade</h1>
+    </div>
+  </header>
+  <p class="tag">极速 PDF 拆分 · 全程本地处理，文件不上传 · 隐私安全</p>
+
+  <!-- Upload -->
+  <div id="drop" class="drop">
+    <input type="file" id="file" accept="application/pdf" class="hide">
+    <div class="ico">📄</div>
+    <h2>拖入 PDF，或点击选择</h2>
+    <p>所有拆分都在你的浏览器内完成，文件永不离开本机</p>
+    <button class="btn">选择 PDF 文件</button>
+  </div>
+
+  <!-- App -->
+  <div id="app" class="app">
+    <div class="bar">
+      <div class="file-meta">
+        <div class="name" id="fname">—</div>
+        <div class="sub" id="fsub">—</div>
+      </div>
+      <button class="btn ghost" id="reset">↺ 换个文件</button>
+    </div>
+
+    <div class="modes">
+      <div class="mode active" data-mode="select">🎯 挑选页面</div>
+      <div class="mode" data-mode="range">✂️ 按范围拆分</div>
+      <div class="mode" data-mode="every">🔪 逐页拆分</div>
+    </div>
+
+    <!-- SELECT mode -->
+    <div class="panel" id="p-select">
+      <div class="selbar">
+        <div>
+          <h3>挑选页面合成新 PDF</h3>
+          <div class="cnt" id="selcnt">已选 0 页</div>
+        </div>
+        <div class="row">
+          <button class="btn ghost" id="selall">全选</button>
+          <button class="btn ghost" id="selnone">清空</button>
+        </div>
+      </div>
+      <div class="grid" id="grid"></div>
+      <div class="prog" id="prog1"><i></i></div>
+      <div class="actions" style="margin-top:18px">
+        <button class="btn" id="doSelect" disabled>导出所选页面 →</button>
+      </div>
+    </div>
+
+    <!-- RANGE mode -->
+    <div class="panel hide" id="p-range">
+      <h3>按页码范围拆分</h3>
+      <div class="hint">用逗号分隔多个区间，每个区间导出为一个 PDF。例：<b>1-3, 5, 8-10</b></div>
+      <div class="row">
+        <input type="text" id="ranges" placeholder="1-3, 5, 8-10">
+      </div>
+      <div class="prog" id="prog2"><i></i></div>
+      <div class="actions" style="margin-top:18px">
+        <button class="btn" id="doRange">按范围导出 →</button>
+      </div>
+    </div>
+
+    <!-- EVERY mode -->
+    <div class="panel hide" id="p-every">
+      <h3>每 N 页拆成一份</h3>
+      <div class="hint">把文档每 N 页切成一个独立 PDF，打包为 ZIP 下载。</div>
+      <div class="row">
+        <label class="fld">每份页数
+          <input type="number" id="chunk" value="1" min="1" style="width:120px">
+        </label>
+      </div>
+      <div class="prog" id="prog3"><i></i></div>
+      <div class="actions" style="margin-top:18px">
+        <button class="btn" id="doEvery">拆分并打包 ZIP →</button>
+      </div>
+    </div>
+  </div>
+
+  <p class="foot">PDF Blade · 由 <b>pdf-lib</b> + <b>pdf.js</b> 驱动 · 100% 本地运行</p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const $=s=>document.querySelector(s);
+let srcBytes=null, srcDoc=null, pageCount=0, baseName='document', selected=new Set();
+
+function toast(msg,type=''){const t=$('#toast');t.textContent=msg;t.className='toast show '+type;
+  clearTimeout(t._t);t._t=setTimeout(()=>t.className='toast',2600);}
+function fmtSize(b){return b<1048576?(b/1024).toFixed(0)+' KB':(b/1048576).toFixed(2)+' MB';}
+
+// ---- Upload handling ----
+const drop=$('#drop'),fileInput=$('#file');
+drop.onclick=()=>fileInput.click();
+fileInput.onchange=e=>{if(e.target.files[0])loadFile(e.target.files[0]);};
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f)loadFile(f);});
+
+async function loadFile(file){
+  if(file.type!=='application/pdf' && !file.name.toLowerCase().endsWith('.pdf')){
+    toast('请选择 PDF 文件','err');return;}
+  try{
+    srcBytes=new Uint8Array(await file.arrayBuffer());
+    srcDoc=await PDFLib.PDFDocument.load(srcBytes,{ignoreEncryption:true});
+    pageCount=srcDoc.getPageCount();
+    baseName=file.name.replace(/\.pdf$/i,'')||'document';
+    $('#fname').textContent=file.name;
+    $('#fsub').textContent=`${pageCount} 页 · ${fmtSize(file.size)}`;
+    drop.classList.add('hide');$('#app').style.display='block';
+    selected.clear();updateSelCnt();
+    renderThumbs(file);
+  }catch(err){console.error(err);toast('无法读取该 PDF：'+err.message,'err');}
+}
+
+// ---- Thumbnails (pdf.js) ----
+async function renderThumbs(file){
+  const grid=$('#grid');grid.innerHTML='';
+  const buf=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  for(let i=1;i<=pdf.numPages;i++){
+    const cell=document.createElement('div');cell.className='thumb';cell.dataset.page=i-1;
+    cell.innerHTML=`<div class="ck">✓</div><div class="pg">${i}</div>`;
+    cell.onclick=()=>toggle(i-1,cell);
+    grid.appendChild(cell);
+    const page=await pdf.getPage(i);
+    const vp0=page.getViewport({scale:1});
+    const scale=200/vp0.width;
+    const vp=page.getViewport({scale});
+    const cv=document.createElement('canvas');
+    cv.width=vp.width;cv.height=vp.height;
+    cell.insertBefore(cv,cell.firstChild);
+    page.render({canvasContext:cv.getContext('2d'),viewport:vp});
+  }
+}
+function toggle(idx,cell){
+  if(selected.has(idx)){selected.delete(idx);cell.classList.remove('sel');}
+  else{selected.add(idx);cell.classList.add('sel');}
+  updateSelCnt();
+}
+function updateSelCnt(){
+  $('#selcnt').textContent='已选 '+selected.size+' 页';
+  $('#doSelect').disabled=selected.size===0;
+}
+$('#selall').onclick=()=>{selected.clear();document.querySelectorAll('.thumb').forEach(c=>{
+  selected.add(+c.dataset.page);c.classList.add('sel');});updateSelCnt();};
+$('#selnone').onclick=()=>{selected.clear();document.querySelectorAll('.thumb').forEach(c=>c.classList.remove('sel'));updateSelCnt();};
+
+// ---- Mode tabs ----
+document.querySelectorAll('.mode').forEach(m=>m.onclick=()=>{
+  document.querySelectorAll('.mode').forEach(x=>x.classList.remove('active'));
+  m.classList.add('active');
+  const mode=m.dataset.mode;
+  $('#p-select').classList.toggle('hide',mode!=='select');
+  $('#p-range').classList.toggle('hide',mode!=='range');
+  $('#p-every').classList.toggle('hide',mode!=='every');
+});
+
+$('#reset').onclick=()=>{srcBytes=srcDoc=null;$('#app').style.display='none';
+  drop.classList.remove('hide');fileInput.value='';};
+
+// ---- Helpers ----
+// "删页"思路：从原始字节重新加载文档，删掉不需要的页后保存。
+// 这样保留原文件的内部结构与子集化字体，保存时自动回收孤立对象，体积不膨胀。
+async function buildPdf(indices){
+  const keep=new Set(indices);
+  const doc=await PDFLib.PDFDocument.load(srcBytes,{ignoreEncryption:true});
+  // 从后往前删，避免索引位移；保留的页保持原有相对顺序
+  for(let i=doc.getPageCount()-1;i>=0;i--){
+    if(!keep.has(i))doc.removePage(i);
+  }
+  return doc.save({useObjectStreams:true});
+}
+function download(bytes,name){
+  const blob=new Blob([bytes],{type:'application/pdf'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');
+  a.href=url;a.download=name;a.click();URL.revokeObjectURL(url);
+}
+function setProg(el,v){el.classList.add('show');el.querySelector('i').style.width=v+'%';
+  if(v>=100)setTimeout(()=>el.classList.remove('show'),600);}
+
+// ---- Export: selected pages ----
+$('#doSelect').onclick=async()=>{
+  const idx=[...selected].sort((a,b)=>a-b);
+  if(!idx.length)return;
+  const p=$('#prog1');setProg(p,30);
+  try{const bytes=await buildPdf(idx);setProg(p,100);
+    download(bytes,`${baseName}_selected_${idx.length}p.pdf`);
+    toast(`已导出 ${idx.length} 页 ✓`,'ok');}
+  catch(e){toast('导出失败：'+e.message,'err');}
+};
+
+// ---- Export: ranges ----
+function parseRanges(str){
+  const out=[];
+  for(let part of str.split(',')){
+    part=part.trim();if(!part)continue;
+    const m=part.match(/^(\d+)\s*-\s*(\d+)$/);
+    if(m){let a=+m[1],b=+m[2];if(a>b)[a,b]=[b,a];out.push({label:`${a}-${b}`,pages:range(a,b)});}
+    else if(/^\d+$/.test(part)){out.push({label:part,pages:[+part-1]});}
+    else throw new Error('无法识别区间："'+part+'"');
+  }
+  return out;
+}
+function range(a,b){const r=[];for(let i=a;i<=b;i++)r.push(i-1);return r;}
+$('#doRange').onclick=async()=>{
+  let groups;
+  try{groups=parseRanges($('#ranges').value);}catch(e){return toast(e.message,'err');}
+  if(!groups.length)return toast('请输入页码范围，如 1-3, 5','err');
+  for(const g of groups)for(const pg of g.pages)
+    if(pg<0||pg>=pageCount)return toast(`页码超出范围（共 ${pageCount} 页）`,'err');
+  const p=$('#prog2');
+  try{
+    if(groups.length===1){
+      setProg(p,40);const bytes=await buildPdf(groups[0].pages);setProg(p,100);
+      download(bytes,`${baseName}_${groups[0].label}.pdf`);
+      toast('已导出 1 个文件 ✓','ok');
+    }else{
+      const zip=new JSZip();let i=0;
+      for(const g of groups){const bytes=await buildPdf(g.pages);
+        zip.file(`${baseName}_${g.label}.pdf`,bytes);setProg(p,Math.round(++i/groups.length*90));}
+      const blob=await zip.generateAsync({type:'blob'});setProg(p,100);
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+      a.download=`${baseName}_split.zip`;a.click();
+      toast(`已导出 ${groups.length} 个文件（ZIP）✓`,'ok');
+    }
+  }catch(e){toast('导出失败：'+e.message,'err');}
+};
+
+// ---- Export: every N pages ----
+$('#doEvery').onclick=async()=>{
+  const n=Math.max(1,parseInt($('#chunk').value)||1);
+  const p=$('#prog3');
+  try{
+    const chunks=[];for(let i=0;i<pageCount;i+=n)chunks.push(range(i+1,Math.min(i+n,pageCount)));
+    if(chunks.length===1){
+      setProg(p,40);const bytes=await buildPdf(chunks[0]);setProg(p,100);
+      download(bytes,`${baseName}.pdf`);return toast('整份导出 ✓','ok');
+    }
+    const zip=new JSZip();const pad=String(chunks.length).length;
+    for(let i=0;i<chunks.length;i++){const bytes=await buildPdf(chunks[i]);
+      zip.file(`${baseName}_part${String(i+1).padStart(pad,'0')}.pdf`,bytes);
+      setProg(p,Math.round((i+1)/chunks.length*90));}
+    const blob=await zip.generateAsync({type:'blob'});setProg(p,100);
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download=`${baseName}_parts.zip`;a.click();
+    toast(`已拆为 ${chunks.length} 份（ZIP）✓`,'ok');
+  }catch(e){toast('拆分失败：'+e.message,'err');}
+};
+</script>
+</body>
+</html>

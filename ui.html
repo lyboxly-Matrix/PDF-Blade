@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="matrix">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Blade</title>
+<style>
+  /* ===== 主题变量 =====
+     原则（来自 design-taste-frontend）：中性底 + 单一克制强调色，饱和度收敛，
+     无 AI 紫光晕，阴影染底色，统一圆角；玻璃材质用真 backdrop-filter 并备降级。 */
+  [data-theme="matrix"]{     /* 黑客帝国 · 磷光绿代码雨（默认） */
+    --bg:#040705; --panel:#0a0f0b; --panel-2:#0f160f; --line:#19281a;
+    --text:#caf5cf; --muted:#5f9268; --accent:#22e84a; --accent-soft:#22e84a1f;
+    --on-accent:#021006; --danger:#ff5f56; --ok:#22e84a;
+    --glow-a:rgba(34,232,74,.08); --glow-b:rgba(34,232,74,.04);
+    --font:'JetBrains Mono','Consolas',monospace; --radius:6px;
+  }
+  [data-theme="starwars"]{   /* 星球大战 · 太空黑 + 片头黄 */
+    --bg:#050507; --panel:#0d0e12; --panel-2:#14161c; --line:#23262f;
+    --text:#e9ebf0; --muted:#7f8593; --accent:#ffe81f; --accent-soft:#ffe81f1c;
+    --on-accent:#141200; --danger:#ff4d4d; --ok:#4ab3ff;
+    --glow-a:rgba(255,232,31,.07); --glow-b:rgba(74,179,255,.08);
+    --font:'Bahnschrift','Segoe UI',system-ui,sans-serif; --radius:8px;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0;user-select:none}
+  input{user-select:text}
+  html,body{height:100%}
+  body{
+    font-family:var(--font);background-color:var(--bg);color:var(--text);
+    min-height:100vh;padding:30px 22px;-webkit-font-smoothing:antialiased;
+    overflow-x:hidden;position:relative;transition:background-color .3s,color .3s;
+  }
+  body::before{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
+    background:radial-gradient(1100px 560px at 18% -12%,var(--glow-a),transparent 60%),
+               radial-gradient(900px 480px at 92% -4%,var(--glow-b),transparent 58%);}
+  /* 代码雨画布：固定全屏，置于内容之后 */
+  #rain{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:0;
+    transition:opacity .6s}
+  /* 主题图腾：电影标志性符号作为背景水印 */
+  body::after{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.07;
+    background-repeat:no-repeat;background-position:center 44%;background-size:min(420px,50vmin);
+    transition:opacity .4s}
+  [data-theme="starwars"] body::after{opacity:.06;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 220'%3E%3Cg fill='none' stroke='%23ffe81f' stroke-width='3'%3E%3Ccircle cx='110' cy='110' r='80'/%3E%3Ccircle cx='150' cy='75' r='20'/%3E%3Cline x1='32' y1='96' x2='188' y2='96'/%3E%3Cline x1='110' y1='30' x2='110' y2='190'/%3E%3C/g%3E%3C/svg%3E")}
+  .wrap{max-width:1020px;margin:0 auto;position:relative;z-index:1}
+
+  /* ===== 顶栏 ===== */
+  header{display:flex;align-items:center;gap:13px}
+  .logo{width:42px;height:42px;border-radius:11px;background:var(--accent);
+    display:grid;place-items:center;color:var(--on-accent);
+    box-shadow:0 6px 22px var(--accent-soft)}
+  .logo svg{width:22px;height:22px}
+  h1{font-size:23px;font-weight:700;letter-spacing:-.4px;color:var(--text)}
+  h1 b{color:var(--accent);font-weight:700}
+  .lang{margin-left:auto;background:var(--panel);color:var(--text);border:1px solid var(--line);
+    border-radius:999px;padding:6px 10px;font-size:12px;font-family:inherit;cursor:pointer;outline:none;transition:.18s}
+  .lang:hover{border-color:var(--accent)}
+  .lang:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .fx{display:flex;align-items:center;gap:7px;cursor:pointer;
+    color:var(--muted);font-size:12px;font-weight:600;user-select:none;
+    border:1px solid var(--line);padding:6px 11px;border-radius:999px;transition:.18s}
+  .fx:hover{color:var(--text);border-color:var(--accent)}
+  .fx .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);transition:.18s}
+  .fx.on{color:var(--text);border-color:var(--accent)}
+  .fx.on .dot{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+  .swatches{display:flex;gap:8px}
+  .sw{width:24px;height:24px;border-radius:50%;cursor:pointer;border:2px solid transparent;
+    transition:.18s;position:relative}
+  .sw:hover{transform:scale(1.12)}
+  .sw.on{border-color:var(--text)}
+  .tag{color:var(--muted);font-size:13px;margin:8px 0 24px 55px}
+
+  /* ===== 通用控件 ===== */
+  .btn{background:var(--accent);color:var(--on-accent);border:none;padding:11px 24px;
+    border-radius:10px;font-size:14.5px;font-weight:600;cursor:pointer;font-family:inherit;
+    transition:.18s;box-shadow:0 4px 14px var(--accent-soft)}
+  .btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+  .btn:active{transform:translateY(0)}
+  .btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:none;color:var(--text)}
+  .btn.ghost:hover{border-color:var(--accent);background:var(--panel-2);filter:none}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none;filter:none}
+  .btn svg{width:16px;height:16px;vertical-align:-3px;margin-left:6px}
+
+  /* ===== 拖拽区 ===== */
+  .drop{border:1.5px dashed var(--line);border-radius:var(--radius);background:var(--panel);
+    padding:56px 24px;text-align:center;cursor:pointer;transition:.22s}
+  .drop:hover{border-color:var(--accent);background:var(--panel-2)}
+  .drop .ico{width:52px;height:52px;margin:0 auto 16px;color:var(--accent)}
+  .drop h2{font-size:19px;font-weight:600;margin-bottom:7px}
+  .drop p{color:var(--muted);font-size:13.5px}
+  .drop .btn{margin-top:18px;display:inline-flex;align-items:center}
+
+  /* ===== 主视图 ===== */
+  .app{display:none;margin-top:22px}
+  .bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;background:var(--panel);
+    border:1px solid var(--line);border-radius:var(--radius);padding:14px 18px;margin-bottom:16px}
+  .file-meta{flex:1;min-width:200px}
+  .file-meta .name{font-weight:600;font-size:14.5px;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;max-width:520px}
+  .file-meta .sub{color:var(--muted);font-size:12.5px;margin-top:3px}
+
+  .modes{display:flex;gap:6px;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;padding:5px;margin-bottom:16px;flex-wrap:wrap}
+  .mode{flex:1;min-width:130px;display:flex;align-items:center;justify-content:center;gap:8px;
+    padding:11px;border-radius:9px;cursor:pointer;color:var(--muted);font-weight:600;
+    font-size:13.5px;transition:.18s}
+  .mode svg{width:17px;height:17px}
+  .mode.active{background:var(--accent);color:var(--on-accent)}
+  .mode:not(.active):hover{background:var(--panel-2);color:var(--text)}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px;margin-bottom:16px}
+  .panel h3{font-size:15.5px;margin-bottom:6px;font-weight:600}
+  .panel .hint{color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.6}
+  .panel .hint b{color:var(--accent)}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  input[type=text],input[type=number]{background:var(--bg);border:1px solid var(--line);
+    color:var(--text);padding:11px 14px;border-radius:10px;font-size:14px;outline:none;
+    transition:.18s;font-family:inherit}
+  input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  input[type=text]{flex:1;min-width:220px}
+  label.fld{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(116px,1fr));
+    gap:13px;max-height:max(160px,calc(100vh - 470px));overflow-y:auto;padding:4px;perspective:1100px}
+  .thumb{position:relative;border:2px solid var(--line);border-radius:10px;overflow:hidden;
+    cursor:pointer;background:#fff;transition:transform .12s ease-out,border-color .16s,box-shadow .16s;
+    aspect-ratio:.74;display:grid;place-items:center;transform-style:preserve-3d;will-change:transform}
+  .thumb img{width:100%;height:100%;object-fit:contain;display:block}
+  .thumb .ld{position:absolute;color:#aaa;font-size:11px}
+  .thumb .pg{position:absolute;left:6px;bottom:6px;background:rgba(10,10,15,.8);color:#fff;
+    font-size:11px;padding:2px 7px;border-radius:6px;font-weight:600}
+  .thumb .ck{position:absolute;right:6px;top:6px;width:20px;height:20px;border-radius:50%;
+    background:rgba(10,10,15,.55);display:grid;place-items:center;color:#fff;font-size:12px;opacity:0}
+  .thumb.sel{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .thumb.sel .ck{opacity:1;background:var(--accent);color:var(--on-accent)}
+  .thumb:hover{transform:translateY(-2px)}
+
+  /* 目录树 */
+  .tree{max-height:max(200px,calc(100vh - 400px));overflow-y:auto;padding:2px}
+  /* 矮窗口：收紧留白，保证操作按钮始终在视口内 */
+  @media (max-height:660px){
+    body{padding:14px 22px}
+    .tag{margin-bottom:12px}
+    .bar{padding:10px 14px;margin-bottom:10px}
+    .modes{margin-bottom:10px;padding:4px}
+    .mode{padding:8px}
+    .panel{padding:14px;margin-bottom:10px}
+    .actions{margin-top:10px}
+    .selbar{margin-bottom:8px}
+    .foot{display:none}
+  }
+  .tnode{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;
+    transition:.14s;border:1px solid transparent}
+  .tnode:hover{background:var(--panel-2);border-color:var(--line)}
+  .tnode .caret{width:16px;height:16px;flex:none;display:grid;place-items:center;
+    color:var(--muted);transition:transform .15s;cursor:pointer;font-size:10px}
+  .tnode .caret.open{transform:rotate(90deg)}
+  .tnode .caret.leaf{visibility:hidden}
+  .tnode .ttitle{flex:1;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+  .tnode.lvl1 .ttitle{font-weight:600}
+  .tnode .tmeta{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .tnode .texp{background:transparent;border:1px solid var(--line);color:var(--muted);
+    font-family:inherit;font-size:12px;font-weight:600;padding:5px 11px;border-radius:8px;
+    cursor:pointer;transition:.15s;opacity:0;white-space:nowrap}
+  .tnode:hover .texp{opacity:1}
+  .tnode .texp:hover{border-color:var(--accent);color:var(--accent)}
+  .tree .empty{color:var(--muted);font-size:13.5px;text-align:center;padding:36px 10px}
+
+  .selbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px}
+  .selbar .cnt{color:var(--muted);font-size:13px}
+  .actions{display:flex;gap:12px;justify-content:flex-end;flex-wrap:wrap;margin-top:18px}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(140px);
+    background:var(--panel);border:1px solid var(--line);padding:13px 22px;border-radius:11px;
+    font-size:13.5px;box-shadow:0 14px 44px rgba(0,0,0,.35);transition:.32s;z-index:99;max-width:80%}
+  .toast.show{transform:translateX(-50%) translateY(0)}
+  .toast.ok{border-color:var(--ok)}.toast.err{border-color:var(--danger)}
+
+  .busy{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;place-items:center;z-index:90}
+  .busy.show{display:grid}
+  .spinner{width:50px;height:50px;border:3px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .busy .txt{margin-top:16px;color:#ddd;font-size:13.5px;text-align:center}
+
+  .foot{text-align:center;color:var(--muted);font-size:12px;margin-top:26px}
+  .foot b{color:var(--accent)}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
+  ::-webkit-scrollbar-thumb:hover{background:var(--accent)}
+  .hide{display:none!important}
+</style>
+</head>
+<body>
+<canvas id="rain"></canvas>
+<div class="wrap">
+  <header>
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/>
+      </svg>
+    </div>
+    <h1>PDF <b>Blade</b></h1>
+    <select class="lang" id="lang" title="Language"></select>
+    <div class="fx" id="fx"><span class="dot"></span><span id="fxlabel">动效</span></div>
+    <div class="swatches" id="swatches"></div>
+  </header>
+  <p class="tag" id="tag">极速 PDF 拆分 · 本地处理不上传 · mupdf 引擎，拆出来不膨胀</p>
+
+  <div id="drop" class="drop">
+    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/>
+    </svg>
+    <h2 id="dropTitle">点击选择 PDF 文件</h2>
+    <p id="dropSub">由 PyMuPDF 引擎驱动，自动去重压缩，文件不会变大</p>
+    <button class="btn" id="dropBtn">选择 PDF 文件</button>
+  </div>
+
+  <div id="app" class="app">
+    <div class="bar">
+      <div class="file-meta">
+        <div class="name" id="fname">—</div>
+        <div class="sub" id="fsub">—</div>
+      </div>
+      <button class="btn ghost" id="reset">换个文件</button>
+    </div>
+
+    <div class="modes">
+      <div class="mode active" data-mode="select">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M17 14l2 2 3-3"/></svg><span class="ml">挑选页面</span>
+      </div>
+      <div class="mode" data-mode="range">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg><span class="ml">按范围拆分</span>
+      </div>
+      <div class="mode" data-mode="toc">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg><span class="ml">按目录导出</span>
+      </div>
+    </div>
+
+    <div class="panel" id="p-select">
+      <div class="selbar">
+        <div><h3 id="selTitle">挑选页面合成新 PDF</h3><div class="cnt" id="selcnt">已选 0 页</div></div>
+        <div class="row">
+          <button class="btn ghost" id="selall">全选</button>
+          <button class="btn ghost" id="selnone">清空</button>
+        </div>
+      </div>
+      <div class="grid" id="grid"></div>
+      <div class="actions"><button class="btn" id="doSelect" disabled>导出所选页面</button></div>
+    </div>
+
+    <div class="panel hide" id="p-range">
+      <h3 id="rangeTitle">按页码范围拆分</h3>
+      <div class="hint" id="rangeHint">逗号分隔多个区间，每个区间一个 PDF（多个时存到所选文件夹）。例：<b>1-3, 5, 8-10</b></div>
+      <div class="row"><input type="text" id="ranges" placeholder="1-3, 5, 8-10"></div>
+      <div class="actions"><button class="btn" id="doRange">按范围导出</button></div>
+    </div>
+
+    <div class="panel hide" id="p-toc">
+      <h3 id="tocTitle">按目录结构导出</h3>
+      <div class="hint" id="tocHint">下方是 PDF 的目录树。点任意条目右侧的 <b>导出本节</b>，会把该节点<b>及其下所有子内容</b>对应的页面导出为一个 PDF。</div>
+      <div class="tree" id="tree"></div>
+    </div>
+  </div>
+
+  <p class="foot" id="foot">PDF Blade · 引擎 <b>PyMuPDF (mupdf)</b> · 100% 本地运行</p>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="busy" id="busy"><div style="text-align:center"><div class="spinner" style="margin:0 auto"></div><div class="txt" id="busytxt">处理中…</div></div></div>
+
+<script>
+const $=s=>document.querySelector(s);
+let pageCount=0, selected=new Set(), curInfo=null;
+let tocItems=[], tocExpanded=[], tocRows=[];
+
+/* ===== 国际化 i18n（自动跟随系统 + 手动切换）===== */
+const LANGS=[['zh','简体中文'],['en','English'],['es','Español'],['pt','Português'],['fr','Français'],['de','Deutsch'],['ru','Русский'],['ja','日本語'],['ko','한국어'],['ar','العربية']];
+const T={
+ zh:{tag:'极速 PDF 拆分 · 本地处理不上传 · mupdf 引擎，拆出来不膨胀',fxLabel:'动效',fxTitle:'开关动态效果（代码雨 / 3D 倾斜）',dropTitle:'点击选择 PDF 文件',dropSub:'由 PyMuPDF 引擎驱动，自动去重压缩，文件不会变大',dropBtn:'选择 PDF 文件',reset:'换个文件',mSelect:'挑选页面',mRange:'按范围拆分',mToc:'按目录导出',selTitle:'挑选页面合成新 PDF',selall:'全选',selnone:'清空',doSelect:'导出所选页面',selCount:'已选 {n} 页',rangeTitle:'按页码范围拆分',rangeHint:'逗号分隔多个区间，每个区间一个 PDF（多个时存到所选文件夹）。例：<b>1-3, 5, 8-10</b>',doRange:'按范围导出',tocTitle:'按目录结构导出',tocHint:'下方是 PDF 的目录树。点任意条目右侧的 <b>导出本节</b>，会把该节点<b>及其下所有子内容</b>对应的页面导出为一个 PDF。',tocExp:'导出本节',tocLoading:'正在读取目录…',tocEmpty:'此 PDF 没有内嵌目录（书签）。<br>可改用“挑选页面”或“按范围拆分”。',tocFail:'读取目录失败',foot:'PDF Blade · 引擎 <b>PyMuPDF (mupdf)</b> · 100% 本地运行',fileMeta:'{p} 页 · {s}',busyLoad:'正在加载 PDF…',busyGen:'正在生成 PDF…',busySplit:'正在拆分…',busySection:'正在导出本节…',loadFail:'加载失败：{m}',notPdf:'请选择 PDF 文件',exportOk:'导出成功 ✓ {s}',filesOk:'已导出 {n} 个文件 ✓ → {p}',fail:'失败：{m}',needRange:'请输入页码范围，如 1-3, 5',rangeBad:'无法识别区间："{p}"',rangeOOR:'页码超出范围（共 {n} 页）',pgN:'{n} 页'},
+ en:{tag:'Fast PDF splitter · 100% local, no upload · mupdf engine, no bloat',fxLabel:'Effects',fxTitle:'Toggle motion effects (code rain / 3D tilt)',dropTitle:'Click to choose a PDF',dropSub:'Powered by PyMuPDF — deduplicated and compressed, no size bloat',dropBtn:'Choose PDF file',reset:'Change file',mSelect:'Pick pages',mRange:'Split by range',mToc:'Export by outline',selTitle:'Combine selected pages into a new PDF',selall:'Select all',selnone:'Clear',doSelect:'Export selected pages',selCount:'{n} pages selected',rangeTitle:'Split by page range',rangeHint:'Comma-separate ranges; each becomes one PDF (saved to a folder if several). e.g. <b>1-3, 5, 8-10</b>',doRange:'Export ranges',tocTitle:'Export by outline structure',tocHint:'Below is the PDF outline. Click <b>Export section</b> on any item to export that node <b>and all its sub-content</b> as one PDF.',tocExp:'Export section',tocLoading:'Reading outline…',tocEmpty:'This PDF has no embedded outline (bookmarks).<br>Use “Pick pages” or “Split by range” instead.',tocFail:'Failed to read outline',foot:'PDF Blade · Engine <b>PyMuPDF (mupdf)</b> · Runs 100% locally',fileMeta:'{p} pages · {s}',busyLoad:'Loading PDF…',busyGen:'Generating PDF…',busySplit:'Splitting…',busySection:'Exporting section…',loadFail:'Load failed: {m}',notPdf:'Please choose a PDF file',exportOk:'Exported ✓ {s}',filesOk:'Exported {n} files ✓ → {p}',fail:'Failed: {m}',needRange:'Enter a page range, e.g. 1-3, 5',rangeBad:'Unrecognized range: "{p}"',rangeOOR:'Page out of range (total {n})',pgN:'{n} pages'},
+ es:{tag:'Divisor PDF rápido · 100% local, sin subir · motor mupdf, sin inflar',fxLabel:'Efectos',fxTitle:'Activar efectos (lluvia de código / inclinación 3D)',dropTitle:'Haz clic para elegir un PDF',dropSub:'Con motor PyMuPDF: deduplica y comprime, sin aumentar el tamaño',dropBtn:'Elegir archivo PDF',reset:'Cambiar archivo',mSelect:'Elegir páginas',mRange:'Dividir por rango',mToc:'Exportar por índice',selTitle:'Combinar páginas seleccionadas en un nuevo PDF',selall:'Seleccionar todo',selnone:'Limpiar',doSelect:'Exportar páginas seleccionadas',selCount:'{n} páginas seleccionadas',rangeTitle:'Dividir por rango de páginas',rangeHint:'Separa rangos con comas; cada uno es un PDF (a una carpeta si hay varios). ej. <b>1-3, 5, 8-10</b>',doRange:'Exportar rangos',tocTitle:'Exportar por estructura del índice',tocHint:'Abajo está el índice del PDF. Pulsa <b>Exportar sección</b> en un elemento para exportar ese nodo <b>y todo su sub-contenido</b> como un PDF.',tocExp:'Exportar sección',tocLoading:'Leyendo el índice…',tocEmpty:'Este PDF no tiene índice (marcadores).<br>Usa “Elegir páginas” o “Dividir por rango”.',tocFail:'Error al leer el índice',foot:'PDF Blade · Motor <b>PyMuPDF (mupdf)</b> · 100% local',fileMeta:'{p} páginas · {s}',busyLoad:'Cargando PDF…',busyGen:'Generando PDF…',busySplit:'Dividiendo…',busySection:'Exportando sección…',loadFail:'Error al cargar: {m}',notPdf:'Elige un archivo PDF',exportOk:'Exportado ✓ {s}',filesOk:'{n} archivos exportados ✓ → {p}',fail:'Error: {m}',needRange:'Introduce un rango, ej. 1-3, 5',rangeBad:'Rango no reconocido: "{p}"',rangeOOR:'Página fuera de rango (total {n})',pgN:'{n} págs'},
+ pt:{tag:'Divisor de PDF rápido · 100% local, sem upload · motor mupdf, sem inchaço',fxLabel:'Efeitos',fxTitle:'Alternar efeitos (chuva de código / inclinação 3D)',dropTitle:'Clique para escolher um PDF',dropSub:'Com motor PyMuPDF: remove duplicados e comprime, sem inchar o ficheiro',dropBtn:'Escolher ficheiro PDF',reset:'Trocar ficheiro',mSelect:'Escolher páginas',mRange:'Dividir por intervalo',mToc:'Exportar por índice',selTitle:'Combinar páginas selecionadas num novo PDF',selall:'Selecionar tudo',selnone:'Limpar',doSelect:'Exportar páginas selecionadas',selCount:'{n} páginas selecionadas',rangeTitle:'Dividir por intervalo de páginas',rangeHint:'Separe intervalos por vírgulas; cada um vira um PDF (numa pasta se vários). ex. <b>1-3, 5, 8-10</b>',doRange:'Exportar intervalos',tocTitle:'Exportar pela estrutura do índice',tocHint:'Abaixo está o índice do PDF. Clique em <b>Exportar secção</b> num item para exportar esse nó <b>e todo o seu sub-conteúdo</b> como um PDF.',tocExp:'Exportar secção',tocLoading:'A ler o índice…',tocEmpty:'Este PDF não tem índice (marcadores).<br>Use “Escolher páginas” ou “Dividir por intervalo”.',tocFail:'Falha ao ler o índice',foot:'PDF Blade · Motor <b>PyMuPDF (mupdf)</b> · 100% local',fileMeta:'{p} páginas · {s}',busyLoad:'A carregar PDF…',busyGen:'A gerar PDF…',busySplit:'A dividir…',busySection:'A exportar secção…',loadFail:'Falha ao carregar: {m}',notPdf:'Escolha um ficheiro PDF',exportOk:'Exportado ✓ {s}',filesOk:'{n} ficheiros exportados ✓ → {p}',fail:'Falha: {m}',needRange:'Introduza um intervalo, ex. 1-3, 5',rangeBad:'Intervalo não reconhecido: "{p}"',rangeOOR:'Página fora do intervalo (total {n})',pgN:'{n} págs'},
+ fr:{tag:'Séparateur PDF rapide · 100% local, sans envoi · moteur mupdf, sans gonflement',fxLabel:'Effets',fxTitle:'Activer les effets (pluie de code / inclinaison 3D)',dropTitle:'Cliquez pour choisir un PDF',dropSub:'Propulsé par PyMuPDF : dédoublonne et compresse, sans gonfler le fichier',dropBtn:'Choisir un fichier PDF',reset:'Changer de fichier',mSelect:'Choisir des pages',mRange:'Diviser par plage',mToc:'Exporter par signets',selTitle:'Combiner les pages choisies en un nouveau PDF',selall:'Tout sélectionner',selnone:'Effacer',doSelect:'Exporter les pages choisies',selCount:'{n} pages sélectionnées',rangeTitle:'Diviser par plage de pages',rangeHint:'Séparez les plages par des virgules ; chacune devient un PDF (dans un dossier si plusieurs). ex. <b>1-3, 5, 8-10</b>',doRange:'Exporter les plages',tocTitle:'Exporter selon la structure des signets',tocHint:'Voici le sommaire du PDF. Cliquez sur <b>Exporter la section</b> sur un élément pour exporter ce nœud <b>et tout son sous-contenu</b> en un PDF.',tocExp:'Exporter la section',tocLoading:'Lecture du sommaire…',tocEmpty:'Ce PDF n’a pas de signets.<br>Utilisez « Choisir des pages » ou « Diviser par plage ».',tocFail:'Échec de lecture du sommaire',foot:'PDF Blade · Moteur <b>PyMuPDF (mupdf)</b> · 100% local',fileMeta:'{p} pages · {s}',busyLoad:'Chargement du PDF…',busyGen:'Génération du PDF…',busySplit:'Découpage…',busySection:'Export de la section…',loadFail:'Échec du chargement : {m}',notPdf:'Choisissez un fichier PDF',exportOk:'Exporté ✓ {s}',filesOk:'{n} fichiers exportés ✓ → {p}',fail:'Échec : {m}',needRange:'Saisissez une plage, ex. 1-3, 5',rangeBad:'Plage non reconnue : « {p} »',rangeOOR:'Page hors plage (total {n})',pgN:'{n} pages'},
+ de:{tag:'Schneller PDF-Splitter · 100% lokal, kein Upload · mupdf-Engine, ohne Aufblähen',fxLabel:'Effekte',fxTitle:'Effekte umschalten (Code-Regen / 3D-Neigung)',dropTitle:'Zum Auswählen einer PDF klicken',dropSub:'Mit PyMuPDF: dedupliziert und komprimiert, ohne die Datei aufzublähen',dropBtn:'PDF-Datei wählen',reset:'Datei wechseln',mSelect:'Seiten wählen',mRange:'Nach Bereich teilen',mToc:'Nach Inhalt exportieren',selTitle:'Gewählte Seiten zu neuer PDF zusammenführen',selall:'Alle wählen',selnone:'Leeren',doSelect:'Gewählte Seiten exportieren',selCount:'{n} Seiten gewählt',rangeTitle:'Nach Seitenbereich teilen',rangeHint:'Bereiche per Komma trennen; je ein PDF (in einen Ordner, wenn mehrere). z. B. <b>1-3, 5, 8-10</b>',doRange:'Bereiche exportieren',tocTitle:'Nach Inhaltsverzeichnis exportieren',tocHint:'Unten ist das Inhaltsverzeichnis. Klicke bei einem Eintrag auf <b>Abschnitt exportieren</b>, um diesen Knoten <b>samt allen Unterinhalten</b> als ein PDF zu exportieren.',tocExp:'Abschnitt exportieren',tocLoading:'Inhalt wird gelesen…',tocEmpty:'Diese PDF hat kein Inhaltsverzeichnis (Lesezeichen).<br>Nutze „Seiten wählen“ oder „Nach Bereich teilen“.',tocFail:'Inhalt konnte nicht gelesen werden',foot:'PDF Blade · Engine <b>PyMuPDF (mupdf)</b> · 100% lokal',fileMeta:'{p} Seiten · {s}',busyLoad:'PDF wird geladen…',busyGen:'PDF wird erstellt…',busySplit:'Wird geteilt…',busySection:'Abschnitt wird exportiert…',loadFail:'Laden fehlgeschlagen: {m}',notPdf:'Bitte eine PDF-Datei wählen',exportOk:'Exportiert ✓ {s}',filesOk:'{n} Dateien exportiert ✓ → {p}',fail:'Fehlgeschlagen: {m}',needRange:'Bereich eingeben, z. B. 1-3, 5',rangeBad:'Bereich nicht erkannt: „{p}“',rangeOOR:'Seite außerhalb des Bereichs (gesamt {n})',pgN:'{n} Seiten'},
+ ru:{tag:'Быстрая нарезка PDF · 100% локально, без загрузки · движок mupdf, без раздувания',fxLabel:'Эффекты',fxTitle:'Переключить эффекты (код-дождь / 3D-наклон)',dropTitle:'Нажмите, чтобы выбрать PDF',dropSub:'На движке PyMuPDF: дедупликация и сжатие, без раздувания файла',dropBtn:'Выбрать файл PDF',reset:'Сменить файл',mSelect:'Выбрать страницы',mRange:'Разбить по диапазону',mToc:'Экспорт по оглавлению',selTitle:'Собрать выбранные страницы в новый PDF',selall:'Выбрать все',selnone:'Очистить',doSelect:'Экспорт выбранных страниц',selCount:'Выбрано страниц: {n}',rangeTitle:'Разбить по диапазону страниц',rangeHint:'Диапазоны через запятую; каждый — отдельный PDF (в папку, если несколько). напр. <b>1-3, 5, 8-10</b>',doRange:'Экспорт диапазонов',tocTitle:'Экспорт по структуре оглавления',tocHint:'Ниже — оглавление PDF. Нажмите <b>Экспорт раздела</b> у пункта, чтобы экспортировать этот узел <b>и всё его содержимое</b> одним PDF.',tocExp:'Экспорт раздела',tocLoading:'Чтение оглавления…',tocEmpty:'В этом PDF нет оглавления (закладок).<br>Используйте «Выбрать страницы» или «Разбить по диапазону».',tocFail:'Не удалось прочитать оглавление',foot:'PDF Blade · Движок <b>PyMuPDF (mupdf)</b> · 100% локально',fileMeta:'{p} стр. · {s}',busyLoad:'Загрузка PDF…',busyGen:'Создание PDF…',busySplit:'Разбивка…',busySection:'Экспорт раздела…',loadFail:'Ошибка загрузки: {m}',notPdf:'Выберите файл PDF',exportOk:'Экспортировано ✓ {s}',filesOk:'Экспортировано файлов: {n} ✓ → {p}',fail:'Ошибка: {m}',needRange:'Введите диапазон, напр. 1-3, 5',rangeBad:'Не распознан диапазон: «{p}»',rangeOOR:'Страница вне диапазона (всего {n})',pgN:'{n} стр.'},
+ ja:{tag:'高速PDF分割 · 完全ローカル、アップロードなし · mupdfエンジン、肥大化しない',fxLabel:'演出',fxTitle:'演出の切り替え（コードレイン / 3D傾き）',dropTitle:'クリックしてPDFを選択',dropSub:'PyMuPDFエンジン搭載：重複排除と圧縮で、ファイルが大きくなりません',dropBtn:'PDFファイルを選択',reset:'ファイルを変更',mSelect:'ページを選ぶ',mRange:'範囲で分割',mToc:'目次で書き出し',selTitle:'選んだページを新しいPDFにまとめる',selall:'すべて選択',selnone:'クリア',doSelect:'選択ページを書き出し',selCount:'{n}ページ選択中',rangeTitle:'ページ範囲で分割',rangeHint:'範囲をカンマ区切りで。各範囲が1つのPDFに（複数ならフォルダへ）。例：<b>1-3, 5, 8-10</b>',doRange:'範囲を書き出し',tocTitle:'目次構造で書き出し',tocHint:'下はPDFの目次です。各項目の<b>この節を書き出し</b>を押すと、そのノード<b>と配下すべて</b>を1つのPDFに書き出します。',tocExp:'この節を書き出し',tocLoading:'目次を読み込み中…',tocEmpty:'このPDFには目次（しおり）がありません。<br>「ページを選ぶ」か「範囲で分割」をご利用ください。',tocFail:'目次の読み込みに失敗',foot:'PDF Blade · エンジン <b>PyMuPDF (mupdf)</b> · 100%ローカル動作',fileMeta:'{p}ページ · {s}',busyLoad:'PDFを読み込み中…',busyGen:'PDFを生成中…',busySplit:'分割中…',busySection:'この節を書き出し中…',loadFail:'読み込み失敗：{m}',notPdf:'PDFファイルを選択してください',exportOk:'書き出し完了 ✓ {s}',filesOk:'{n}個のファイルを書き出し ✓ → {p}',fail:'失敗：{m}',needRange:'範囲を入力（例：1-3, 5）',rangeBad:'認識できない範囲：「{p}」',rangeOOR:'ページが範囲外（全{n}ページ）',pgN:'{n}ページ'},
+ ko:{tag:'빠른 PDF 분할 · 100% 로컬, 업로드 없음 · mupdf 엔진, 용량 증가 없음',fxLabel:'효과',fxTitle:'효과 켜기/끄기 (코드 레인 / 3D 기울임)',dropTitle:'클릭하여 PDF 선택',dropSub:'PyMuPDF 엔진: 중복 제거·압축으로 용량이 커지지 않습니다',dropBtn:'PDF 파일 선택',reset:'파일 변경',mSelect:'페이지 선택',mRange:'범위로 분할',mToc:'목차로 내보내기',selTitle:'선택한 페이지를 새 PDF로 합치기',selall:'전체 선택',selnone:'지우기',doSelect:'선택 페이지 내보내기',selCount:'{n}페이지 선택됨',rangeTitle:'페이지 범위로 분할',rangeHint:'범위를 쉼표로 구분; 각 범위가 PDF 하나로(여러 개면 폴더로). 예: <b>1-3, 5, 8-10</b>',doRange:'범위 내보내기',tocTitle:'목차 구조로 내보내기',tocHint:'아래는 PDF 목차입니다. 항목의 <b>이 섹션 내보내기</b>를 누르면 해당 노드 <b>와 모든 하위 내용</b>을 하나의 PDF로 내보냅니다.',tocExp:'이 섹션 내보내기',tocLoading:'목차 읽는 중…',tocEmpty:'이 PDF에는 목차(북마크)가 없습니다.<br>“페이지 선택” 또는 “범위로 분할”을 사용하세요.',tocFail:'목차 읽기 실패',foot:'PDF Blade · 엔진 <b>PyMuPDF (mupdf)</b> · 100% 로컬 실행',fileMeta:'{p}페이지 · {s}',busyLoad:'PDF 불러오는 중…',busyGen:'PDF 생성 중…',busySplit:'분할 중…',busySection:'섹션 내보내는 중…',loadFail:'불러오기 실패: {m}',notPdf:'PDF 파일을 선택하세요',exportOk:'내보내기 완료 ✓ {s}',filesOk:'{n}개 파일 내보냄 ✓ → {p}',fail:'실패: {m}',needRange:'범위 입력, 예: 1-3, 5',rangeBad:'인식할 수 없는 범위: "{p}"',rangeOOR:'페이지 범위 초과 (총 {n})',pgN:'{n}페이지'},
+ ar:{tag:'تقسيم PDF سريع · محلي 100%، بدون رفع · محرك mupdf، بلا تضخّم',fxLabel:'المؤثرات',fxTitle:'تبديل المؤثرات (مطر الشيفرة / إمالة ثلاثية الأبعاد)',dropTitle:'انقر لاختيار ملف PDF',dropSub:'بمحرك PyMuPDF: إزالة التكرار والضغط، دون تضخّم الملف',dropBtn:'اختر ملف PDF',reset:'تغيير الملف',mSelect:'اختيار الصفحات',mRange:'تقسيم حسب النطاق',mToc:'تصدير حسب الفهرس',selTitle:'دمج الصفحات المختارة في PDF جديد',selall:'تحديد الكل',selnone:'مسح',doSelect:'تصدير الصفحات المختارة',selCount:'تم تحديد {n} صفحة',rangeTitle:'تقسيم حسب نطاق الصفحات',rangeHint:'افصل النطاقات بفواصل؛ كل نطاق ملف PDF (إلى مجلد عند تعددها). مثال: <b>1-3, 5, 8-10</b>',doRange:'تصدير النطاقات',tocTitle:'تصدير حسب بنية الفهرس',tocHint:'في الأسفل فهرس الـPDF. اضغط <b>تصدير القسم</b> على أي عنصر لتصدير تلك العقدة <b>وكل ما تحتها</b> كملف PDF واحد.',tocExp:'تصدير القسم',tocLoading:'جارٍ قراءة الفهرس…',tocEmpty:'لا يحتوي هذا الـPDF على فهرس (إشارات مرجعية).<br>استخدم «اختيار الصفحات» أو «تقسيم حسب النطاق».',tocFail:'فشل قراءة الفهرس',foot:'PDF Blade · المحرك <b>PyMuPDF (mupdf)</b> · يعمل محليًا 100%',fileMeta:'{p} صفحة · {s}',busyLoad:'جارٍ تحميل PDF…',busyGen:'جارٍ إنشاء PDF…',busySplit:'جارٍ التقسيم…',busySection:'جارٍ تصدير القسم…',loadFail:'فشل التحميل: {m}',notPdf:'اختر ملف PDF',exportOk:'تم التصدير ✓ {s}',filesOk:'تم تصدير {n} ملفات ✓ ← {p}',fail:'فشل: {m}',needRange:'أدخل نطاقًا، مثال: 1-3, 5',rangeBad:'نطاق غير معروف: «{p}»',rangeOOR:'الصفحة خارج النطاق (الإجمالي {n})',pgN:'{n} صفحة'}
+};
+let lang=localStorage.getItem('pdfblade-lang');
+if(!lang){const n=(navigator.language||'en').toLowerCase();
+  const hit=LANGS.find(([c])=>n===c||n.startsWith(c+'-')); lang=hit?hit[0]:(n.startsWith('zh')?'zh':'en');}
+if(!T[lang])lang='en';
+function t(key,vars){let s=(T[lang]&&T[lang][key])||T.en[key]||key;
+  if(vars)for(const k in vars)s=s.split('{'+k+'}').join(vars[k]); return s;}
+function buildLangSelect(){
+  const sel=$('#lang');sel.innerHTML='';
+  LANGS.forEach(([c,name])=>{const o=document.createElement('option');o.value=c;o.textContent=name;if(c===lang)o.selected=true;sel.appendChild(o);});
+  sel.onchange=()=>{lang=sel.value;localStorage.setItem('pdfblade-lang',lang);applyI18n();
+    try{if(window.pywebview&&window.pywebview.api&&window.pywebview.api.set_lang)window.pywebview.api.set_lang(lang);}catch(e){}};
+}
+function applyI18n(){
+  document.documentElement.lang=lang;
+  document.documentElement.dir=(lang==='ar')?'rtl':'ltr';
+  const sT=(id,k)=>{const e=$('#'+id);if(e)e.textContent=t(k);};
+  const sH=(id,k)=>{const e=$('#'+id);if(e)e.innerHTML=t(k);};
+  sT('tag','tag');sT('fxlabel','fxLabel');const fx=$('#fx');if(fx)fx.title=t('fxTitle');
+  sT('dropTitle','dropTitle');sT('dropSub','dropSub');sT('dropBtn','dropBtn');sT('reset','reset');
+  document.querySelectorAll('.mode .ml').forEach(el=>{const m=el.closest('.mode').dataset.mode;
+    el.textContent=t(m==='select'?'mSelect':m==='range'?'mRange':'mToc');});
+  sT('selTitle','selTitle');sT('selall','selall');sT('selnone','selnone');sT('doSelect','doSelect');
+  sT('rangeTitle','rangeTitle');sH('rangeHint','rangeHint');sT('doRange','doRange');
+  sT('tocTitle','tocTitle');sH('tocHint','tocHint');sH('foot','foot');
+  updateSelCnt();
+  if(curInfo)$('#fsub').textContent=t('fileMeta',{p:curInfo.pages,s:fmtSize(curInfo.size)});
+  if(typeof tocItems!=='undefined'&&tocItems.length)buildTree();
+}
+
+/* ===== 主题切换 ===== */
+const THEMES=[
+  {id:'matrix',  name:'黑客帝国',c:'#22e84a'},
+  {id:'starwars',name:'星球大战',c:'#ffe81f'},
+];
+function buildSwatches(){
+  const box=$('#swatches');
+  let cur=localStorage.getItem('pdfblade-theme')||'matrix';
+  if(!THEMES.some(t=>t.id===cur))cur='matrix';
+  document.documentElement.setAttribute('data-theme',cur);
+  THEMES.forEach(t=>{
+    const d=document.createElement('div');
+    d.className='sw'+(t.id===cur?' on':'');d.style.background=t.c;d.title=t.name;
+    d.onclick=()=>{
+      document.documentElement.setAttribute('data-theme',t.id);
+      localStorage.setItem('pdfblade-theme',t.id);
+      document.querySelectorAll('.sw').forEach(s=>s.classList.remove('on'));
+      d.classList.add('on');
+      refreshRain();
+    };
+    box.appendChild(d);
+  });
+}
+buildSwatches();
+buildLangSelect();
+applyI18n();
+// 启动时把当前语言同步给后端（用于后端消息本地化）
+window.addEventListener('pywebviewready',()=>{try{if(window.pywebview&&window.pywebview.api&&window.pywebview.api.set_lang)window.pywebview.api.set_lang(lang);}catch(e){}});
+setTimeout(()=>{try{if(window.pywebview&&window.pywebview.api&&window.pywebview.api.set_lang)window.pywebview.api.set_lang(lang);}catch(e){}},800);
+
+/* ===== 主题特效引擎：每个电影主题一种招牌动效 + 3D 倾斜 ===== */
+const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let fxOn = (localStorage.getItem('pdfblade-fx') ?? (reduceMotion?'0':'1'))==='1';
+// 主题 → 特效：黑客帝国=代码雨，星战=曲速星场
+const FX_OF={matrix:'rain',starwars:'stars'};
+const FX_OPACITY={rain:0.45,stars:0.85};
+
+const cv=$('#rain'), ctx=cv.getContext('2d');
+const GLYPHS='アァカサタナハマヤラワガザダバパイィキシチニヒミリヰギジヂビピ0123456789ABCDEF<>=/\\|+*';
+let rafId=null, curMode=null, P=[], scene=null, accent='#22e84a';
+
+function accentRGB(){
+  return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#22e84a';
+}
+function sizeCv(){cv.width=window.innerWidth;cv.height=window.innerHeight;}
+function initMode(mode){
+  sizeCv(); P=[];
+  const W=cv.width,H=cv.height;
+  if(mode==='rain'){
+    const n=Math.floor(W/15);
+    for(let i=0;i<n;i++)P.push(Math.random()*-50);
+  }else if(mode==='stars'){
+    for(let i=0;i<240;i++)P.push({x:(Math.random()-0.5)*W,y:(Math.random()-0.5)*H,z:Math.random()*W});
+  }
+}
+function draw(){
+  const W=cv.width,H=cv.height;
+  if(curMode==='rain'){
+    ctx.fillStyle='rgba(4,7,5,0.10)';ctx.fillRect(0,0,W,H);
+    ctx.font='15px monospace';ctx.fillStyle=accent;
+    for(let i=0;i<P.length;i++){
+      const ch=GLYPHS[Math.floor(Math.random()*GLYPHS.length)];
+      ctx.fillText(ch,i*15,P[i]*15);
+      if(P[i]*15>H && Math.random()>0.975)P[i]=0;
+      P[i]+=0.5+Math.random()*0.5;
+    }
+  }else if(curMode==='stars'){
+    ctx.fillStyle='rgba(5,5,7,0.35)';ctx.fillRect(0,0,W,H);
+    const cx=W/2,cy=H/2;
+    for(const s of P){
+      const z0=s.z; s.z-=6; if(s.z<1){s.x=(Math.random()-0.5)*W;s.y=(Math.random()-0.5)*H;s.z=W;continue;}
+      const k=128/s.z, x=cx+s.x*k, y=cy+s.y*k;
+      const k0=128/z0, x0=cx+s.x*k0, y0=cy+s.y*k0;
+      const sz=(1-s.z/W)*2.2;
+      ctx.strokeStyle=accent;ctx.globalAlpha=Math.min(1,(1-s.z/W)+0.2);ctx.lineWidth=sz;
+      ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x,y);ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+  }
+  rafId=requestAnimationFrame(draw);
+}
+function refreshRain(){      // 名称沿用，含义为“刷新当前主题特效”
+  accent=accentRGB();
+  const theme=document.documentElement.getAttribute('data-theme');
+  const mode=FX_OF[theme]||null;
+  if(rafId){cancelAnimationFrame(rafId);rafId=null;}
+  ctx.clearRect(0,0,cv.width,cv.height);
+  if(fxOn && !reduceMotion && mode){
+    curMode=mode; initMode(mode);
+    cv.style.opacity=String(FX_OPACITY[mode]);
+    draw();
+  }else{
+    curMode=null; cv.style.opacity='0';
+  }
+}
+window.addEventListener('resize',()=>{if(curMode)initMode(curMode);});
+
+// 3D 倾斜（鼠标驱动，transform 直接写、不进 React/状态）
+function tilt(el,maxDeg,withPerspective){
+  if(reduceMotion)return;
+  let raf=null;
+  el.addEventListener('pointermove',e=>{
+    if(!fxOn)return;
+    const r=el.getBoundingClientRect();
+    const px=(e.clientX-r.left)/r.width-0.5, py=(e.clientY-r.top)/r.height-0.5;
+    if(raf)cancelAnimationFrame(raf);
+    raf=requestAnimationFrame(()=>{
+      const persp=withPerspective?'perspective(900px) ':'';
+      el.style.transform=`${persp}rotateY(${px*maxDeg}deg) rotateX(${-py*maxDeg}deg) translateZ(8px)`;
+    });
+  });
+  el.addEventListener('pointerleave',()=>{el.style.transform='';});
+}
+tilt($('#drop'),9,true);
+
+function applyFx(){
+  $('#fx').classList.toggle('on',fxOn);
+  refreshRain();
+  if(!fxOn){document.querySelectorAll('.thumb,#drop').forEach(el=>el.style.transform='');}
+}
+$('#fx').onclick=()=>{fxOn=!fxOn;localStorage.setItem('pdfblade-fx',fxOn?'1':'0');applyFx();};
+applyFx();
+
+function toast(msg,type=''){const t=$('#toast');t.textContent=msg;t.className='toast show '+type;
+  clearTimeout(t._t);t._t=setTimeout(()=>t.className='toast',3000);}
+function busy(on,txt){$('#busytxt').textContent=txt||'处理中…';$('#busy').classList.toggle('show',!!on);}
+function fmtSize(b){return b<1048576?(b/1024).toFixed(0)+' KB':(b/1048576).toFixed(2)+' MB';}
+const api=()=>window.pywebview.api;
+
+// ---- 打开文件 ----
+$('#drop').onclick=openFile;
+async function openFile(){
+  busy(true,t('busyLoad'));
+  let info;
+  try{info=await api().open_file();}catch(e){busy(false);return toast(t('loadFail',{m:e}),'err');}
+  busy(false);
+  if(!info)return;
+  if(info.error)return toast(info.error,'err');
+  pageCount=info.pages; curInfo=info;
+  $('#fname').textContent=info.name;
+  $('#fsub').textContent=t('fileMeta',{p:info.pages,s:fmtSize(info.size)});
+  $('#drop').classList.add('hide');$('#app').style.display='block';
+  selected.clear();updateSelCnt();
+  buildGrid();
+  loadToc();
+}
+
+// ---- 目录树（默认收起，点击展开）----
+async function loadToc(){
+  const tree=$('#tree');tree.innerHTML=`<div class="empty">${t('tocLoading')}</div>`;
+  let res;
+  try{res=await api().get_toc();}catch(e){tree.innerHTML=`<div class="empty">${t('tocFail')}</div>`;return;}
+  tocItems=(res&&res.items)||[];
+  tocExpanded=tocItems.map(()=>false);   // 默认全部收起
+  buildTree();
+}
+function buildTree(){
+  const tree=$('#tree');
+  if(!tocItems.length){tree.innerHTML=`<div class="empty">${t('tocEmpty')}</div>`;return;}
+  if(tocExpanded.length!==tocItems.length)tocExpanded=tocItems.map(()=>false);
+  tree.innerHTML='';tocRows=[];
+  tocItems.forEach((it,i)=>{
+    const hasKids=(i+1<tocItems.length)&&(tocItems[i+1].level>it.level);
+    const row=document.createElement('div');
+    row.className='tnode lvl'+Math.min(it.level,3);
+    row.style.paddingLeft=(10+(it.level-1)*20)+'px';
+    const pages=it.end-it.start+1;
+    const range=it.start===it.end?`p${it.start+1}`:`p${it.start+1}-${it.end+1}`;
+    row.innerHTML=`<span class="caret${hasKids?'':' leaf'}">▶</span>
+      <span class="ttitle"></span>
+      <span class="tmeta">${range} · ${t('pgN',{n:pages})}</span>
+      <button class="texp"></button>`;
+    row.querySelector('.ttitle').textContent=it.title;
+    row.querySelector('.texp').textContent=t('tocExp');
+    const toggle=()=>{ if(hasKids){tocExpanded[i]=!tocExpanded[i];renderTocVis();} };
+    row.querySelector('.caret').onclick=toggle;
+    row.querySelector('.ttitle').onclick=toggle;
+    row.querySelector('.texp').onclick=async(e)=>{
+      e.stopPropagation();
+      busy(true,t('busySection'));
+      try{done(await api().export_outline(it.start,it.end,it.title));}
+      catch(err){busy(false);toast(t('fail',{m:err}),'err');}
+    };
+    tocRows.push({row,level:it.level,hasKids});
+    tree.appendChild(row);
+  });
+  renderTocVis();
+}
+// 根据展开状态计算每行可见性（祖先全展开才可见）
+function renderTocVis(){
+  let hideBelow=Infinity;
+  tocRows.forEach((r,i)=>{
+    if(r.level>hideBelow){r.row.style.display='none';return;}
+    hideBelow=Infinity;
+    r.row.style.display='flex';
+    const c=r.row.querySelector('.caret');
+    if(r.hasKids)c.classList.toggle('open',tocExpanded[i]);
+    if(r.hasKids&&!tocExpanded[i])hideBelow=r.level;
+  });
+}
+
+// ---- 缩略图懒加载 ----
+let io;
+function buildGrid(){
+  const grid=$('#grid');grid.innerHTML='';
+  if(io)io.disconnect();
+  io=new IntersectionObserver((entries)=>{
+    entries.forEach(en=>{if(en.isIntersecting){const c=en.target;io.unobserve(c);loadThumb(c);}});
+  },{root:grid,rootMargin:'200px'});
+  for(let i=0;i<pageCount;i++){
+    const cell=document.createElement('div');cell.className='thumb';cell.dataset.page=i;
+    cell.innerHTML=`<div class="ld">…</div><div class="ck">✓</div><div class="pg">${i+1}</div>`;
+    cell.onclick=()=>toggle(i,cell);
+    tilt(cell,12,false);
+    grid.appendChild(cell);io.observe(cell);
+  }
+}
+async function loadThumb(cell){
+  const i=+cell.dataset.page;
+  try{
+    const src=await api().thumb(i);
+    if(src){const img=new Image();img.src=src;img.onload=()=>{
+      const ld=cell.querySelector('.ld');if(ld)ld.remove();
+      cell.insertBefore(img,cell.firstChild);};}
+  }catch(e){}
+}
+function toggle(i,cell){
+  if(selected.has(i)){selected.delete(i);cell.classList.remove('sel');}
+  else{selected.add(i);cell.classList.add('sel');}
+  updateSelCnt();
+}
+function updateSelCnt(){$('#selcnt').textContent=t('selCount',{n:selected.size});
+  $('#doSelect').disabled=selected.size===0;}
+$('#selall').onclick=()=>{document.querySelectorAll('.thumb').forEach(c=>{
+  selected.add(+c.dataset.page);c.classList.add('sel');});updateSelCnt();};
+$('#selnone').onclick=()=>{selected.clear();
+  document.querySelectorAll('.thumb').forEach(c=>c.classList.remove('sel'));updateSelCnt();};
+
+// ---- 模式切换 ----
+document.querySelectorAll('.mode').forEach(m=>m.onclick=()=>{
+  document.querySelectorAll('.mode').forEach(x=>x.classList.remove('active'));
+  m.classList.add('active');const mode=m.dataset.mode;
+  $('#p-select').classList.toggle('hide',mode!=='select');
+  $('#p-range').classList.toggle('hide',mode!=='range');
+  $('#p-toc').classList.toggle('hide',mode!=='toc');
+});
+$('#reset').onclick=()=>{$('#app').style.display='none';$('#drop').classList.remove('hide');};
+
+// ---- 结果反馈 ----
+function done(res){
+  busy(false);
+  if(!res||res.cancelled)return;
+  if(res.error)return toast(t('fail',{m:res.error}),'err');
+  if(res.count&&res.count>1)toast(t('filesOk',{n:res.count,p:res.path}),'ok');
+  else toast(t('exportOk',{s:res.size?('('+fmtSize(res.size)+')'):''}),'ok');
+}
+
+// ---- 导出：所选页面 ----
+$('#doSelect').onclick=async()=>{
+  const idx=[...selected].sort((a,b)=>a-b);if(!idx.length)return;
+  busy(true,t('busyGen'));
+  try{done(await api().export_selected(idx));}catch(e){busy(false);toast(t('fail',{m:e}),'err');}
+};
+
+// ---- 导出：范围 ----
+function parseRanges(str){
+  const out=[];
+  for(let part of str.split(',')){
+    part=part.trim();if(!part)continue;
+    const m=part.match(/^(\d+)\s*-\s*(\d+)$/);
+    if(m){let a=+m[1],b=+m[2];if(a>b)[a,b]=[b,a];out.push({label:`${a}-${b}`,pages:range(a,b)});}
+    else if(/^\d+$/.test(part)){out.push({label:part,pages:[+part-1]});}
+    else throw new Error(t('rangeBad',{p:part}));
+  }
+  return out;
+}
+function range(a,b){const r=[];for(let i=a;i<=b;i++)r.push(i-1);return r;}
+$('#doRange').onclick=async()=>{
+  let groups;try{groups=parseRanges($('#ranges').value);}catch(e){return toast(e.message,'err');}
+  if(!groups.length)return toast(t('needRange'),'err');
+  for(const g of groups)for(const pg of g.pages)
+    if(pg<0||pg>=pageCount)return toast(t('rangeOOR',{n:pageCount}),'err');
+  busy(true,t('busySplit'));
+  try{done(await api().export_ranges(groups));}catch(e){busy(false);toast(t('fail',{m:e}),'err');}
+};
+
+</script>
+</body>
+</html>
