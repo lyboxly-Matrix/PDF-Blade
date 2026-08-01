@@ -1,8 +1,8 @@
 # PDF Blade
 
-一款快速、完全本地运行的 Windows PDF 拆分工具。
+一款专精 PDF 拆分、完全本地运行的网页与 Windows 工具。
 
-PDF Blade 使用 PyMuPDF 处理 PDF，通过 pywebview 提供桌面界面。文件不会上传到服务器；导出时会清理未使用的 PDF 对象并进行压缩，尽量避免拆分后的文件体积膨胀。
+网页版使用 pdf.js 与 pdf-lib，文件始终留在浏览器中；桌面版使用 PyMuPDF 与 pywebview，导出时会清理未使用的 PDF 对象并进行压缩，尽量避免拆分后的文件体积膨胀。
 
 ## 功能
 
@@ -13,6 +13,12 @@ PDF Blade 使用 PyMuPDF 处理 PDF，通过 pywebview 提供桌面界面。文�
 - 简体中文、English、Español、Português、Français、Deutsch、Русский、日本語、한국어、العربية
 - 多主题与可关闭的动态效果
 - 100% 本地处理，无需上传文件
+
+## 在线使用
+
+访问 [PDF Blade 网页版](https://lyboxly-matrix.github.io/PDF-Blade/)，拖入 PDF 即可开始。
+
+网页版无需登录，支持挑选页面、按页码范围拆分，以及沿 PDF 内嵌目录导出章节。所有 PDF 内容都只在浏览器内存中处理。
 
 ## 下载和使用
 
@@ -46,7 +52,8 @@ pyinstaller --noconfirm "PDF Blade.spec"
 - `app.py`：桌面入口、pywebview API 和 PyMuPDF 处理逻辑
 - `ui.html`：正式桌面界面
 - `PDF Blade.spec`：PyInstaller 单文件构建配置
-- `index.html`：早期纯浏览器原型，不参与桌面版构建
+- `index.html`：正式网页版，使用 pdf.js、pdf-lib 与 JSZip 在浏览器本地处理
+- `.github/workflows/pages.yml`：自动发布网页版到 GitHub Pages
 
 核心导出流程会创建新的 PDF，插入所需页面，并使用 `garbage=4`、`deflate=True` 和 `clean=True` 保存。
 
