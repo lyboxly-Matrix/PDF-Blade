@@ -1,0 +1,18 @@
+{
+  "name": "PDF Blade - PDF 拆分工具",
+  "short_name": "PDF Blade",
+  "description": "文件不上传的在线 PDF 拆分工具",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#050912",
+  "theme_color": "#050912",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "assets/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

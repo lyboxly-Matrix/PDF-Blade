@@ -3,12 +3,57 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="PDF Blade 是一款专注 PDF 拆分的本地浏览器工具。挑选页面、按范围或沿目录拆分，文件不会上传。">
+  <meta name="description" content="免费在线 PDF 拆分工具：挑选页面、按页码范围或 PDF 目录精准拆分。文件只在浏览器本地处理，无需上传、无需登录。">
   <meta name="theme-color" content="#050912">
-  <title>PDF Blade — 一个页面，只做 PDF 拆分</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta name="author" content="PDF Blade">
+  <link rel="canonical" href="https://lyboxly-matrix.github.io/PDF-Blade/">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="site.webmanifest">
+
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:site_name" content="PDF Blade">
+  <meta property="og:title" content="PDF拆分工具 - 在线分割PDF、按页码和目录拆分 | PDF Blade">
+  <meta property="og:description" content="一个页面，只做 PDF 拆分。文件不上传，支持挑选页面、页码范围和目录书签拆分。">
+  <meta property="og:url" content="https://lyboxly-matrix.github.io/PDF-Blade/">
+  <meta property="og:image" content="https://lyboxly-matrix.github.io/PDF-Blade/assets/pdf-blade-og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="PDF Blade 免费在线 PDF 拆分工具">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PDF拆分工具 | PDF Blade">
+  <meta name="twitter:description" content="本地处理、不上传文件的在线 PDF 拆分工具。">
+  <meta name="twitter:image" content="https://lyboxly-matrix.github.io/PDF-Blade/assets/pdf-blade-og.png">
+
+  <title>PDF拆分工具 - 在线分割PDF、按页码和目录拆分 | PDF Blade</title>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "PDF Blade",
+    "url": "https://lyboxly-matrix.github.io/PDF-Blade/",
+    "description": "免费在线 PDF 拆分工具，支持挑选页面、按页码范围和 PDF 目录书签拆分，文件只在浏览器本地处理。",
+    "applicationCategory": "UtilitiesApplication",
+    "operatingSystem": "Web Browser, Windows",
+    "inLanguage": "zh-CN",
+    "isAccessibleForFree": true,
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "CNY"
+    },
+    "downloadUrl": "https://github.com/lyboxly-Matrix/PDF-Blade/releases/latest",
+    "sameAs": "https://github.com/lyboxly-Matrix/PDF-Blade",
+    "featureList": [
+      "挑选指定 PDF 页面并合成为新文件",
+      "按页码范围批量拆分 PDF",
+      "按 PDF 目录或书签导出章节",
+      "文件在浏览器本地处理，不上传服务器"
+    ]
+  }
+  </script>
   <style>
     :root {
       color-scheme: dark;
@@ -133,6 +178,15 @@
         radial-gradient(circle at 50% 54%, rgba(88, 74, 203, .16), transparent 30%);
       background-size: 28px 28px, 28px 28px, auto;
     }
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+    }
     .drop-zone:hover, .drop-zone.is-over {
       border-color: var(--cyan);
       background-color: rgba(15, 24, 42, .35);
@@ -224,6 +278,25 @@
     .privacy { display: flex; justify-content: center; align-items: center; gap: 10px; margin: 26px auto 0; color: var(--muted); font-size: 14px; }
     .privacy svg { width: 18px; height: 18px; color: #a4adbf; }
 
+    .seo-content { width: min(1000px, 100%); margin: 112px auto 0; padding: 82px 0 18px; border-top: 1px solid rgba(83,96,120,.22); }
+    .seo-lead { max-width: 720px; }
+    .seo-lead h2, .faq h2 { margin: 0; color: var(--text); font-size: clamp(28px, 3.2vw, 44px); line-height: 1.18; letter-spacing: -.04em; }
+    .seo-lead p { margin: 18px 0 0; color: #a3acbd; font-size: 16px; line-height: 1.85; }
+    .method-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin-top: 58px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .method { min-width: 0; padding: 30px 30px 32px 0; }
+    .method + .method { padding-left: 30px; border-left: 1px solid var(--line); }
+    .method-index { display: block; margin-bottom: 23px; color: var(--violet-2); font-size: 11px; font-weight: 720; letter-spacing: .14em; }
+    .method h3 { margin: 0; color: #eef1f7; font-size: 17px; letter-spacing: -.015em; }
+    .method p { margin: 10px 0 0; color: var(--muted); font-size: 13px; line-height: 1.75; }
+    .faq { margin-top: 100px; }
+    .faq-list { margin-top: 38px; border-top: 1px solid var(--line); }
+    .faq details { border-bottom: 1px solid var(--line); }
+    .faq summary { min-height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 20px; color: #dfe4ed; font-size: 15px; font-weight: 610; cursor: pointer; list-style: none; }
+    .faq summary::-webkit-details-marker { display: none; }
+    .faq summary::after { content: "+"; flex: none; color: var(--violet-2); font-size: 22px; font-weight: 350; transition: transform .2s ease; }
+    .faq details[open] summary::after { transform: rotate(45deg); }
+    .faq details p { max-width: 780px; margin: -4px 0 24px; color: var(--muted); font-size: 14px; line-height: 1.8; }
+
     .workspace { position: relative; padding: 20px 22px 24px; animation: rise .45s var(--ease) both; }
     .file-bar { display: flex; align-items: center; gap: 16px; padding: 15px 17px; margin-bottom: 16px; border: 1px solid var(--line); border-radius: 14px; background: rgba(8, 14, 25, .58); }
     .file-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--good); box-shadow: 0 0 14px rgba(84,225,176,.45); flex: none; }
@@ -311,6 +384,12 @@
       .mode-rail { margin: 10px 14px 12px; }
       .mode-button { min-height: 60px; font-size: 14px; }
       .workspace { padding: 16px 14px 18px; }
+      .seo-content { margin-top: 82px; padding-top: 62px; }
+      .method-list { grid-template-columns: 1fr; margin-top: 42px; }
+      .method, .method + .method { padding: 24px 0; border-left: 0; }
+      .method + .method { border-top: 1px solid var(--line); }
+      .method-index { margin-bottom: 13px; }
+      .faq { margin-top: 70px; }
     }
 
     @media (min-width: 821px) and (min-height: 761px) {
@@ -372,6 +451,10 @@
       .outline-pages { display: none; }
       .outline-export { padding: 7px 8px; }
       .site-footer { height: 58px; margin-top: 26px; font-size: 11px; }
+      .seo-content { margin-top: 66px; padding: 50px 6px 4px; }
+      .seo-lead h2, .faq h2 { font-size: 28px; }
+      .seo-lead p { font-size: 14px; line-height: 1.75; }
+      .faq summary { min-height: 62px; font-size: 14px; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -399,7 +482,7 @@
 
     <section class="tool" aria-label="PDF 拆分工具">
       <div id="dropZone" class="drop-zone" role="button" tabindex="0" aria-label="选择或拖入 PDF 文件">
-        <input id="fileInput" type="file" accept="application/pdf,.pdf" hidden>
+        <input id="fileInput" type="file" accept="application/pdf,.pdf" aria-label="选择 PDF 文件">
         <div class="paper paper-a">01</div><div class="paper paper-b">02</div>
         <div class="paper paper-c">03</div><div class="paper paper-d">04</div>
         <span class="blade" aria-hidden="true"></span>
@@ -457,13 +540,71 @@
     </section>
 
     <div class="privacy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 4.5 6v5.2c0 4.7 3 8 7.5 9.8 4.5-1.8 7.5-5.1 7.5-9.8V6L12 3Z"/><path d="m8.8 12 2 2 4.5-5"/></svg><span>文件不上传 · 无需登录 · 免费使用</span></div>
+
+    <section class="seo-content" aria-labelledby="local-split-title">
+      <div class="seo-lead">
+        <h2 id="local-split-title">免费在线拆分 PDF，文件无需上传</h2>
+        <p>PDF Blade 是一款专注 PDF 拆分与页面提取的浏览器工具。选择文件后，解析、预览和导出都在当前设备中完成，不需要注册账号，也不会把 PDF 内容发送到服务器。</p>
+      </div>
+
+      <div class="method-list" aria-label="PDF 拆分方式">
+        <article class="method">
+          <span class="method-index">01 / SELECT</span>
+          <h3>挑选页面</h3>
+          <p>从缩略图中选择任意页面，按照原始顺序合成为一个新的 PDF 文件。</p>
+        </article>
+        <article class="method">
+          <span class="method-index">02 / RANGE</span>
+          <h3>按范围拆分</h3>
+          <p>输入 1-3、5、8-10 等页码范围，一次生成多个 PDF 并自动打包下载。</p>
+        </article>
+        <article class="method">
+          <span class="method-index">03 / OUTLINE</span>
+          <h3>按目录拆分</h3>
+          <p>读取 PDF 内嵌目录或书签，选择章节并导出该节点及其全部子章节。</p>
+        </article>
+      </div>
+
+      <section class="faq" aria-labelledby="faq-title">
+        <h2 id="faq-title">常见问题</h2>
+        <div class="faq-list">
+          <details>
+            <summary>如何拆分 PDF 中的指定页面？</summary>
+            <p>拖入 PDF 后保持“挑选页面”模式，点击需要保留的页面缩略图，再选择“导出所选页面”。新文件会按照原 PDF 的页面顺序生成。</p>
+          </details>
+          <details>
+            <summary>如何按页码范围批量拆分 PDF？</summary>
+            <p>切换到“按范围拆分”，输入类似 1-3, 5, 8-10 的范围。每个范围会生成一个 PDF；输入多个范围时，结果会打包为 ZIP。</p>
+          </details>
+          <details>
+            <summary>可以按照 PDF 目录或书签拆分吗？</summary>
+            <p>可以。PDF Blade 会读取文件内嵌的目录树。导出某个目录节点时，会包含该章节以及它下面的全部子章节。</p>
+          </details>
+          <details>
+            <summary>PDF 文件会上传到服务器吗？</summary>
+            <p>不会。文件读取、页面渲染和拆分全部在浏览器本地执行。关闭或刷新页面后，当前 PDF 数据会从页面内存中释放。</p>
+          </details>
+          <details>
+            <summary>拆分 PDF 会降低页面清晰度吗？</summary>
+            <p>不会重新截图或压缩页面图像。工具直接复制原 PDF 页面对象，因此文字、矢量内容和图片保持原有质量。</p>
+          </details>
+          <details>
+            <summary>为什么有些 PDF 没有可用目录？</summary>
+            <p>“按目录拆分”依赖 PDF 文件中已经存在的目录或书签。如果原文件没有内嵌目录，可以改用“挑选页面”或“按范围拆分”。</p>
+          </details>
+        </div>
+      </section>
+    </section>
   </main>
 
   <footer class="site-footer shell">PDF Blade — 一个页面，只做 PDF 拆分。</footer>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+  <script src="assets/vendor/pdf.min.js"></script>
+  <script src="assets/vendor/pdf-lib.min.js"></script>
+  <script src="assets/vendor/jszip.min.js"></script>
   <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'assets/vendor/pdf.worker.min.js';
 
     const $ = (selector) => document.querySelector(selector);
     const state = { bytes: null, pdfLibDoc: null, pdfJsDoc: null, pages: 0, baseName: 'document', selected: new Set(), mode: 'select', outline: [], expanded: [] };
@@ -500,9 +641,7 @@
       if (!busy) updateSelectionStatus();
     }
 
-    function chooseFile() { elements.fileInput.click(); }
-    elements.dropZone.addEventListener('click', chooseFile);
-    elements.dropZone.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); chooseFile(); } });
+    elements.dropZone.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); elements.fileInput.click(); } });
     elements.fileInput.addEventListener('change', (event) => { if (event.target.files[0]) loadFile(event.target.files[0]); });
     ['dragenter', 'dragover'].forEach((name) => elements.dropZone.addEventListener(name, (event) => { event.preventDefault(); elements.dropZone.classList.add('is-over'); }));
     ['dragleave', 'drop'].forEach((name) => elements.dropZone.addEventListener(name, (event) => { event.preventDefault(); elements.dropZone.classList.remove('is-over'); }));
