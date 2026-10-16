@@ -1,5 +1,31 @@
 # PDF Blade
 
+**从一整份 PDF，留下真正需要的页面。**
+
+挑选页面 · 范围拆分 · 按目录导出。
+
+[下载 Windows 版本](https://github.com/lyboxly-Matrix/PDF-Blade/releases) · [在线体验](https://lyboxly-matrix.github.io/PDF-Blade/) · [亮点](#项目亮点) · [快速上手](#快速上手) · [使用与开发](#使用与开发) · [反馈问题](https://github.com/lyboxly-Matrix/PDF-Blade/issues)
+
+![PDF Blade 功能流程：打开 PDF → 选择内容 → 导出文件](overview.svg)
+
+> 图中为功能流程示意，并非应用界面截图。
+
+## 项目亮点
+
+| 亮点 | 能帮你做什么 |
+| --- | --- |
+| **三种拆分方式** | 手选页面、输入页码范围，或沿内嵌书签按章节导出。 |
+| **打开浏览器即可体验** | 网页版无需登录，PDF 内容只在浏览器本地处理。 |
+| **桌面版适合本地工作流** | 提供 Windows EXE；导出时清理未使用对象并压缩，尽量控制文件体积。 |
+
+## 快速上手
+
+[打开网页版](https://lyboxly-matrix.github.io/PDF-Blade/) → 拖入 PDF → 选择页面、范围或目录章节 → 导出。
+
+Windows 用户也可在 Releases 下载 `PDF-Blade-windows-x64.exe`，直接运行。
+
+## 使用与开发
+
 一款专精 PDF 拆分、完全本地运行的网页与 Windows 工具。
 
 网页版使用 pdf.js 与 pdf-lib，文件始终留在浏览器中；桌面版使用 PyMuPDF 与 pywebview，导出时会清理未使用的 PDF 对象并进行压缩，尽量避免拆分后的文件体积膨胀。
@@ -73,3 +99,4 @@ git push origin v1.0.0
 ## 许可证
 
 本项目采用 [MIT License](LICENSE)。
+
